@@ -2,7 +2,8 @@
 //   npm run db:types          (local)
 //   npm run db:types:remote   (hosted project)
 // This hand-written copy mirrors supabase/migrations/20260926000001_init.sql
-// so the project type-checks before you have a database running.
+// and 20260927000001_pos_features.sql so the project type-checks before you
+// have a database running.
 
 export type Json = string | number | boolean | null | { [key: string]: Json | undefined } | Json[];
 
@@ -36,9 +37,9 @@ export type Database = {
         Relationships: [];
       };
       branch_counters: {
-        Row: { branch_id: string; receipt_seq: number; transfer_seq: number };
-        Insert: { branch_id: string; receipt_seq?: number; transfer_seq?: number };
-        Update: { branch_id?: string; receipt_seq?: number; transfer_seq?: number };
+        Row: { branch_id: string; receipt_seq: number; transfer_seq: number; order_seq: number };
+        Insert: { branch_id: string; receipt_seq?: number; transfer_seq?: number; order_seq?: number };
+        Update: { branch_id?: string; receipt_seq?: number; transfer_seq?: number; order_seq?: number };
         Relationships: [];
       };
       profiles: {
@@ -192,6 +193,13 @@ export type Database = {
             referencedRelation: "products";
             referencedColumns: ["id"];
           },
+          {
+            foreignKeyName: "inventory_movements_created_by_fkey";
+            columns: ["created_by"];
+            isOneToOne: false;
+            referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          },
         ];
       };
       recipes: {
@@ -259,7 +267,15 @@ export type Database = {
         };
         Insert: Record<string, never>; // write via RPC only
         Update: Record<string, never>;
-        Relationships: [];
+        Relationships: [
+          {
+            foreignKeyName: "cash_shifts_cashier_id_fkey";
+            columns: ["cashier_id"];
+            isOneToOne: false;
+            referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          },
+        ];
       };
       cash_drawer_events: {
         Row: {
@@ -305,7 +321,22 @@ export type Database = {
         };
         Insert: Record<string, never>; // write via RPC only
         Update: Record<string, never>;
-        Relationships: [];
+        Relationships: [
+          {
+            foreignKeyName: "transactions_cashier_id_fkey";
+            columns: ["cashier_id"];
+            isOneToOne: false;
+            referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "transactions_voided_by_fkey";
+            columns: ["voided_by"];
+            isOneToOne: false;
+            referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          },
+        ];
       };
       transaction_items: {
         Row: {
@@ -393,6 +424,80 @@ export type Database = {
           },
         ];
       };
+      discount_logs: {
+        Row: {
+          id: number;
+          transaction_id: string;
+          branch_id: string;
+          discount_type: "senior" | "pwd";
+          customer_name: string;
+          id_number: string;
+          discount_amount: number;
+          created_by: string | null;
+          created_at: string;
+        };
+        Insert: Record<string, never>; // written by process_sale only
+        Update: Record<string, never>;
+        Relationships: [
+          {
+            foreignKeyName: "discount_logs_transaction_id_fkey";
+            columns: ["transaction_id"];
+            isOneToOne: false;
+            referencedRelation: "transactions";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "discount_logs_created_by_fkey";
+            columns: ["created_by"];
+            isOneToOne: false;
+            referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      special_orders: {
+        Row: {
+          id: string;
+          order_no: string;
+          branch_id: string;
+          customer_name: string;
+          customer_phone: string | null;
+          items: string;
+          total: number;
+          pickup_at: string;
+          status: Database["public"]["Enums"]["order_status"];
+          notes: string | null;
+          created_by: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: Record<string, never>; // write via RPC only
+        Update: Record<string, never>;
+        Relationships: [];
+      };
+      special_order_payments: {
+        Row: {
+          id: number;
+          order_id: string;
+          amount: number;
+          method: Database["public"]["Enums"]["payment_method"];
+          payment_ref: string | null;
+          drawer_event_id: number | null;
+          created_by: string | null;
+          created_at: string;
+        };
+        Insert: Record<string, never>; // write via RPC only
+        Update: Record<string, never>;
+        Relationships: [
+          {
+            foreignKeyName: "special_order_payments_order_id_fkey";
+            columns: ["order_id"];
+            isOneToOne: false;
+            referencedRelation: "special_orders";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
     };
     Views: {
       v_branch_daily_sales: {
@@ -416,6 +521,24 @@ export type Database = {
           quantity: number;
           reorder_level: number;
         };
+        Relationships: [];
+      };
+      v_open_drawers: {
+        Row: {
+          shift_id: string;
+          branch_id: string;
+          cashier_id: string;
+          cashier_name: string | null;
+          opened_at: string;
+          opening_float: number;
+          txn_count: number;
+          cash_sales: number;
+          expected_cash: number;
+        };
+        Relationships: [];
+      };
+      v_special_orders: {
+        Row: Database["public"]["Tables"]["special_orders"]["Row"] & { paid: number; balance: number };
         Relationships: [];
       };
     };
@@ -470,6 +593,74 @@ export type Database = {
         Args: { p_shift_id: string; p_closing_count: number };
         Returns: Database["public"]["Tables"]["cash_shifts"]["Row"];
       };
+      admin_list_staff: {
+        Args: Record<PropertyKey, never>;
+        Returns: Array<{
+          id: string;
+          email: string;
+          full_name: string;
+          is_active: boolean;
+          is_super_admin: boolean;
+          default_branch_id: string | null;
+          last_sign_in_at: string | null;
+          created_at: string;
+          roles: Json;
+        }>;
+      };
+      admin_create_staff: {
+        Args: { p_email: string; p_password: string; p_full_name: string; p_roles: Json };
+        Returns: string;
+      };
+      admin_update_staff: {
+        Args: { p_user_id: string; p_full_name: string; p_roles: Json };
+        Returns: undefined;
+      };
+      admin_set_password: { Args: { p_user_id: string; p_password: string }; Returns: undefined };
+      admin_set_staff_active: { Args: { p_user_id: string; p_active: boolean }; Returns: undefined };
+      record_leftovers: {
+        Args: { p_branch_id: string; p_items: Json; p_note?: string | null };
+        Returns: number;
+      };
+      report_best_sellers: {
+        Args: { p_branch_ids: string[] | null; p_from: string; p_to: string };
+        Returns: Array<{ product_id: string; product_name: string; qty: number; revenue: number }>;
+      };
+      report_sales_by_hour: {
+        Args: { p_branch_ids: string[] | null; p_from: string; p_to: string };
+        Returns: Array<{ hour: number; txn_count: number; net_sales: number }>;
+      };
+      report_waste: {
+        Args: { p_branch_ids: string[] | null; p_from: string; p_to: string };
+        Returns: Array<{ product_id: string; product_name: string; unit: string; sold_qty: number; wasted_qty: number }>;
+      };
+      create_special_order: {
+        Args: {
+          p_branch_id: string;
+          p_customer_name: string;
+          p_customer_phone: string | null;
+          p_items: string;
+          p_total: number;
+          p_pickup_at: string;
+          p_notes?: string | null;
+          p_deposit?: number;
+          p_deposit_method?: Database["public"]["Enums"]["payment_method"];
+          p_deposit_ref?: string | null;
+        };
+        Returns: Database["public"]["Tables"]["special_orders"]["Row"];
+      };
+      pay_special_order: {
+        Args: {
+          p_order_id: string;
+          p_amount: number;
+          p_method: Database["public"]["Enums"]["payment_method"];
+          p_ref?: string | null;
+        };
+        Returns: Database["public"]["Tables"]["special_order_payments"]["Row"];
+      };
+      set_special_order_status: {
+        Args: { p_order_id: string; p_status: Database["public"]["Enums"]["order_status"] };
+        Returns: Database["public"]["Tables"]["special_orders"]["Row"];
+      };
     };
     Enums: {
       app_role: "branch_manager" | "cashier" | "baker";
@@ -478,6 +669,7 @@ export type Database = {
       txn_status: "completed" | "voided";
       transfer_status: "requested" | "dispatched" | "received" | "cancelled";
       shift_status: "open" | "closed";
+      order_status: "pending" | "ready" | "picked_up" | "cancelled";
       movement_reason:
         | "sale"
         | "sale_void"

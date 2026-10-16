@@ -6,9 +6,15 @@ import { useBranch } from "@/context/BranchContext";
 import { useOfflineSync } from "@/hooks/useOfflineSync";
 import { DashboardPage } from "@/pages/DashboardPage";
 import { DrawerPage } from "@/pages/DrawerPage";
+import { EndOfDayPage } from "@/pages/EndOfDayPage";
 import { InventoryPage } from "@/pages/InventoryPage";
 import { LoginPage } from "@/pages/LoginPage";
+import { OrdersPage } from "@/pages/OrdersPage";
 import { POSPage } from "@/pages/POSPage";
+import { ProductsPage } from "@/pages/ProductsPage";
+import { ReportsPage } from "@/pages/ReportsPage";
+import { SalesPage } from "@/pages/SalesPage";
+import { StaffPage } from "@/pages/StaffPage";
 import { TransfersPage } from "@/pages/TransfersPage";
 
 function RequireAuth({ children }: { children: ReactNode }) {
@@ -26,6 +32,17 @@ function RequireAuth({ children }: { children: ReactNode }) {
   return <>{children}</>;
 }
 
+/**
+ * Where each person starts. The owner monitors, so they land on the dashboard
+ * (no cash drawer needed). Staff who sell land on Sell; bakers on Stock.
+ */
+function HomeRedirect() {
+  const { branches, isSuperAdmin, can } = useBranch();
+  // Check every branch, not just the active one: it may not be picked yet.
+  const sells = branches.some((b) => can("pos.sell", b.branch.id));
+  return <Navigate to={isSuperAdmin ? "/dashboard" : sells ? "/pos" : "/inventory"} replace />;
+}
+
 export default function App() {
   useOfflineSync();
   return (
@@ -39,12 +56,19 @@ export default function App() {
         }
       >
         <Route path="/pos" element={<POSPage />} />
+        <Route path="/sales" element={<SalesPage />} />
+        <Route path="/orders" element={<OrdersPage />} />
+        <Route path="/end-of-day" element={<EndOfDayPage />} />
         <Route path="/drawer" element={<DrawerPage />} />
         <Route path="/inventory" element={<InventoryPage />} />
         <Route path="/transfers" element={<TransfersPage />} />
         <Route path="/dashboard" element={<DashboardPage />} />
+        <Route path="/reports" element={<ReportsPage />} />
+        <Route path="/products" element={<ProductsPage />} />
+        <Route path="/staff" element={<StaffPage />} />
+        {/* Inside RequireAuth so the role is loaded before choosing a home. */}
+        <Route path="*" element={<HomeRedirect />} />
       </Route>
-      <Route path="*" element={<Navigate to="/pos" replace />} />
     </Routes>
   );
 }

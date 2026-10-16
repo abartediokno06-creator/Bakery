@@ -1,11 +1,16 @@
 import { useState } from "react";
 import { useMutation } from "@tanstack/react-query";
-import { Button } from "@/components/ui/button";
+import { Link } from "react-router-dom";
+import { Moon } from "lucide-react";
+import { Button, buttonVariants } from "@/components/ui/button";
 import { Card, CardBody, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { Select } from "@/components/ui/select";
+import { PickBranch } from "@/components/layout/PickBranch";
 import { useBranch } from "@/context/BranchContext";
 import { useAuth } from "@/context/AuthContext";
 import { useShift } from "@/hooks/useShift";
+import { useT } from "@/lib/i18n";
 import { supabase, toErrorMessage } from "@/lib/supabase";
 import { formatPeso, toNumber } from "@/lib/utils";
 import type { ShiftReport } from "@/types/domain";
@@ -13,19 +18,20 @@ import type { ShiftReport } from "@/types/domain";
 const METHOD_LABEL = { cash: "Cash", gcash: "GCash", qrph: "QR Ph", card: "Card" } as const;
 
 function ReportTable({ report, title }: { report: ShiftReport; title: string }) {
+  const { t } = useT();
   const rows: Array<[string, number]> = [
-    ["Opening float", report.opening_float],
-    ["Gross sales", report.gross_sales],
-    ["Discounts", -report.discounts],
-    ["Net sales", report.net_sales],
+    [t("Opening float"), report.opening_float],
+    [t("Gross sales"), report.gross_sales],
+    [t("Discount"), -report.discounts],
+    [t("Net sales"), report.net_sales],
     ...report.by_method.map((m): [string, number] => [`${METHOD_LABEL[m.payment_method]} (${m.txn_count})`, m.amount]),
-    ["Pay-ins", report.pay_in],
-    ["Pay-outs", -report.pay_out],
-    ["Cash drops", -report.cash_drop],
-    ["Expected cash in drawer", report.expected_cash],
+    [t("Pay-ins"), report.pay_in],
+    [t("Pay-outs"), -report.pay_out],
+    [t("Cash drops"), -report.cash_drop],
+    [t("Expected cash in drawer"), report.expected_cash],
   ];
-  if (report.closing_count !== undefined) rows.push(["Counted cash", report.closing_count]);
-  if (report.variance !== undefined) rows.push(["Over / short", report.variance]);
+  if (report.closing_count !== undefined) rows.push([t("Counted cash"), report.closing_count]);
+  if (report.variance !== undefined) rows.push([t("Over / short"), report.variance]);
 
   return (
     <Card>
@@ -43,7 +49,7 @@ function ReportTable({ report, title }: { report: ShiftReport; title: string }) 
               </tr>
             ))}
             <tr>
-              <td className="py-2 text-muted">Sales / voids</td>
+              <td className="py-2 text-muted">{t("Sales / voids")}</td>
               <td className="py-2 text-right font-semibold tabular-nums">
                 {report.txn_count} / {report.void_count}
               </td>
@@ -57,12 +63,15 @@ function ReportTable({ report, title }: { report: ShiftReport; title: string }) 
 
 export function DrawerPage() {
   const { activeBranch } = useBranch();
-  if (!activeBranch) return <p className="p-8 text-muted">Pick a branch in the top bar first.</p>;
+  const { t } = useT();
+  if (!activeBranch) return <PickBranch purpose={t("Pick a branch to see its cash drawer.")} />;
   return <Drawer branchId={activeBranch.id} />;
 }
 
 function Drawer({ branchId }: { branchId: string }) {
+  const { t } = useT();
   const { user } = useAuth();
+  const { can } = useBranch();
   const { shift, close, xReport } = useShift(branchId);
   const [report, setReport] = useState<{ data: ShiftReport; title: string } | null>(null);
   const [count, setCount] = useState("");
@@ -90,7 +99,7 @@ function Drawer({ branchId }: { branchId: string }) {
   });
 
   if (!shift && !report) {
-    return <p className="p-8 text-muted">No open drawer. Open one from the Sell screen.</p>;
+    return <p className="p-8 text-muted">{t("No open drawer. Open one from the Sell screen.")}</p>;
   }
 
   return (
@@ -99,7 +108,7 @@ function Drawer({ branchId }: { branchId: string }) {
         <div className="space-y-4">
           <Card>
             <CardHeader>
-              <CardTitle>Drawer opened {new Date(shift.opened_at).toLocaleTimeString("en-PH")}</CardTitle>
+              <CardTitle>{t("Drawer opened {time}", { time: new Date(shift.opened_at).toLocaleTimeString("en-PH", { hour: "numeric", minute: "2-digit" }) })}</CardTitle>
             </CardHeader>
             <CardBody className="space-y-3">
               <Button
@@ -107,42 +116,47 @@ function Drawer({ branchId }: { branchId: string }) {
                 className="w-full"
                 onClick={async () => {
                   try {
-                    setReport({ data: await xReport(shift.id), title: "X report (shift so far)" });
+                    setReport({ data: await xReport(shift.id), title: t("X report (shift so far)") });
                   } catch (e) {
                     setError(toErrorMessage(e));
                   }
                 }}
               >
-                Print X report
+                {t("Print X report")}
               </Button>
             </CardBody>
           </Card>
 
           <Card>
-            <CardHeader><CardTitle>Cash in / out</CardTitle></CardHeader>
+            <CardHeader><CardTitle>{t("Cash in / out")}</CardTitle></CardHeader>
             <CardBody className="space-y-3">
-              <select
+              <Select
                 value={eventKind}
                 onChange={(e) => setEventKind(e.target.value as typeof eventKind)}
-                className="h-11 w-full rounded-lg border border-line bg-white px-3"
                 aria-label="Type"
               >
-                <option value="pay_out">Pay-out (supplier, expense)</option>
-                <option value="pay_in">Pay-in (added change)</option>
-                <option value="cash_drop">Cash drop (to safe)</option>
-              </select>
-              <Input inputMode="decimal" placeholder="Amount" value={eventAmount} onChange={(e) => setEventAmount(e.target.value)} />
-              <Input placeholder="Note (e.g. ice supplier)" value={eventNote} onChange={(e) => setEventNote(e.target.value)} />
+                <option value="pay_out">{t("Pay-out (supplier, expense)")}</option>
+                <option value="pay_in">{t("Pay-in (added change)")}</option>
+                <option value="cash_drop">{t("Cash drop (to safe)")}</option>
+              </Select>
+              <Input inputMode="decimal" placeholder={t("Amount")} value={eventAmount} onChange={(e) => setEventAmount(e.target.value)} />
+              <Input placeholder={t("Note (e.g. ice supplier)")} value={eventNote} onChange={(e) => setEventNote(e.target.value)} />
               <Button className="w-full" disabled={toNumber(eventAmount) <= 0 || drawerEvent.isPending} onClick={() => drawerEvent.mutate()}>
-                Record {formatPeso(toNumber(eventAmount))}
+                {t("Record {amount}", { amount: formatPeso(toNumber(eventAmount)) })}
               </Button>
             </CardBody>
           </Card>
 
+          {can("leftovers.record") && (
+            <Link to="/end-of-day" className={buttonVariants({ variant: "secondary", size: "lg", className: "w-full" })}>
+              <Moon className="h-5 w-5" aria-hidden /> {t("Before closing: record leftovers")}
+            </Link>
+          )}
+
           <Card>
-            <CardHeader><CardTitle>Close drawer (Z report)</CardTitle></CardHeader>
+            <CardHeader><CardTitle>{t("Close drawer (Z report)")}</CardTitle></CardHeader>
             <CardBody className="space-y-3">
-              <Input inputMode="decimal" placeholder="Counted cash" value={count} onChange={(e) => setCount(e.target.value)} />
+              <Input inputMode="decimal" placeholder={t("Counted cash")} value={count} onChange={(e) => setCount(e.target.value)} />
               <Button
                 variant="danger"
                 className="w-full"
@@ -152,13 +166,13 @@ function Drawer({ branchId }: { branchId: string }) {
                     { shiftId: shift.id, closingCount: toNumber(count) },
                     {
                       onSuccess: (closed) =>
-                        setReport({ data: closed.z_report as unknown as ShiftReport, title: "Z report (end of day)" }),
+                        setReport({ data: closed.z_report as unknown as ShiftReport, title: t("Z report (end of day)") }),
                       onError: (e) => setError(toErrorMessage(e)),
                     },
                   )
                 }
               >
-                Close drawer
+                {t("Close drawer")}
               </Button>
             </CardBody>
           </Card>

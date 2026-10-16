@@ -1,25 +1,27 @@
 import type { Config } from "tailwindcss";
 
-// Palette: ube purple as the brand accent (a Filipino bakery staple),
-// with cool neutrals so product tiles and numbers stay the focus.
+// Palette from the GMD Bakery logo: logo green and white, with gold as a
+// small accent. Gold is only a fill behind dark text (never text on white).
+// Amber and red stay for warnings/errors. Text pairings pass WCAG AA.
 export default {
   content: ["./index.html", "./src/**/*.{ts,tsx}"],
   theme: {
     extend: {
       colors: {
-        ink: "#221A2E",
-        surface: "#F6F5F9",
-        line: "#E3E0EA",
-        muted: "#6E6680",
-        ube: { DEFAULT: "#6C3FA3", dark: "#52307D", light: "#EDE5F7" },
-        leaf: "#2F7D4F",
-        amber: "#B8730F",
+        ink: "#13261B",
+        surface: "#F3F8F4",
+        line: "#D8E6DC",
+        muted: "#587062",
+        brand: { DEFAULT: "#096B38", dark: "#06502A", light: "#E6F2EB" },
+        gold: "#F3C430",
+        leaf: "#06502A",
+        amber: "#935705",
         danger: "#B3261E",
       },
       fontFamily: {
         sans: ["Figtree", "system-ui", "sans-serif"],
       },
-      borderRadius: { tile: "14px" },
+      borderRadius: { tile: "18px" },
     },
   },
   plugins: [],

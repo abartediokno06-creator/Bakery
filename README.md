@@ -14,20 +14,44 @@ npm run db:types                   # regenerate src/types/database.types.ts from
 npm run dev                        # http://localhost:5173
 ```
 
-Create users in Studio (http://127.0.0.1:54323 > Authentication > Add user), then run
-`supabase/bootstrap_users.sql` in the SQL editor to make an owner and assign branch roles.
+Create the first owner in Studio (http://127.0.0.1:54323 > Authentication > Add user), then run
+`supabase/bootstrap_users.sql` in the SQL editor to make them the owner. After that, the owner adds
+all other staff from the **Staff** screen in the app.
+
+## Screens and who sees them
+
+| Screen | Who | What it does |
+| --- | --- | --- |
+| Sell | cashier, manager, owner | tap products, Pay, change to give, print receipt; Senior/PWD discount asks for name + ID |
+| Sales | everyone (own branches) | a day's sales, items per sale, reprint receipt; managers and owner can void |
+| Orders | cashier, manager, owner | special orders (cakes, bulk) with deposits, balance, pickup date |
+| Drawer | cashier, manager, owner | open/close drawer, pay-in/out, X and Z reports, link to end-of-day leftovers |
+| Stock | everyone | stock per branch; managers adjust stock and record bakes |
+| End of day | cashier, manager, owner | unsold goods removed as spoilage (feeds the waste report) |
+| Transfers | everyone | request > dispatch > receive between branches |
+| Dashboard | everyone (owner lands here) | today's sales per branch, open drawers with expected cash, pickups due |
+| Reports | manager, owner | best sellers, sales by hour, waste %, cashier over/short, stock history, transfers, Senior/PWD log, special orders (CSV export) |
+| Products | owner | add/edit products, photos, per-branch prices and reorder levels |
+| Staff | owner | add staff, assign branches and roles, reset passwords, turn accounts off |
+
+The header has a low-stock bell and an English/Tagalog switch (cashier screens are translated).
 
 ## Folder map
 
 ```
 supabase/
-  migrations/20260926000001_init.sql   schema, RLS, triggers, RPCs, realtime, JWT hook
-  seed.sql                             10 branches, products, pandesal recipe, opening stock
-  bootstrap_users.sql                  make owner / assign managers and cashiers
+  migrations/20260926000001_init.sql          schema, RLS, triggers, RPCs, realtime, JWT hook
+  migrations/20260927000001_pos_features.sql  staff admin, drawer status, leftovers, reports,
+                                              Senior/PWD log, special orders, product photos
+  seed.sql                                    10 branches, products, pandesal recipe, opening stock
+  bootstrap_users.sql                         make the first owner
 src/
   lib/supabase.ts                      typed Supabase client
   lib/offlineDb.ts                     IndexedDB: offline sales queue + stock snapshot
-  types/database.types.ts              Database type (regenerate with npm run db:types)
+  lib/i18n.tsx                         English / Tagalog text for cashier screens
+  lib/printReceipt.ts                  58 mm thermal receipt printing
+  lib/dates.ts, lib/csv.ts             Manila-time date ranges, CSV export
+  types/database.types.ts              Database type (hand-kept; regenerate with npm run db:types)
   types/domain.ts                      app-level types (CartLine, SalePayload, ShiftReport)
   context/BranchContext.tsx            branch switcher context + role permissions
   hooks/useBranchInventory.ts          realtime stock per branch, offline fallback
@@ -36,10 +60,11 @@ src/
   hooks/useTransfers.ts                request > dispatch > receive
   stores/syncStore.ts                  submitSale(): online RPC or offline queue
   stores/cartStore.ts                  cart state
+  components/layout/                   app shell, branch switcher, low-stock bell, language switch
   components/pos/checkoutMath.ts       pure totals/discount/change math
-  components/pos/POSCheckout.tsx       checkout panel (strict props)
+  components/pos/POSCheckout.tsx       order totals + payment step
   components/pos/ProductGrid.tsx       touch grid + barcode scan (Enter key)
-  pages/                               POS, Drawer, Stock, Transfers, Dashboard, Login
+  pages/                               one file per screen in the table above
 docs/ROADMAP.md                        phased plan to production
 ```
 
@@ -53,6 +78,10 @@ docs/ROADMAP.md                        phased plan to production
 | Every stock change is audited | `apply_stock_movement()` writes `inventory_movements` |
 | Sales can't be forged or duplicated | `process_sale()` recomputes totals; `client_id` is unique (safe retries) |
 | Users can't make themselves admin | column-level grant on `profiles` (only `full_name`, `default_branch_id`) |
+| Only the owner manages staff | `admin_*` functions check `is_super_admin()`; accounts are created in SQL, so the service role key never reaches the browser |
+| Turned-off staff are locked out | `admin_set_staff_active` clears `is_active` (RLS) and bans sign-in |
+| Senior/PWD log can't be edited | `discount_logs` is written only inside `process_sale()` |
+| Only the owner uploads product photos | storage policy on the `product-images` bucket |
 
 Roles live in `user_branch_roles` (one user can manage several branches).
 The optional `custom_access_token_hook` copies them into the JWT for the UI; RLS never trusts the JWT copy.
@@ -72,3 +101,8 @@ Stock may go negative after offline sales; it shows as "Out" in red and managers
 The migration, seed, and a scripted scenario (sale, idempotent retry, cross-branch block,
 direct stock edit block, X/Z report, transfer workflow, production deduction, self-promotion block)
 were run against PostgreSQL 16. `tsc --noEmit` and `vite build` pass.
+
+Migration 0002 was tested inside a rolled-back transaction on the hosted project (Senior/PWD sale,
+void, leftovers, reports, special-order rules, staff create/update/password/turn-off, and cashier
+permission blocks), and staff accounts created by `admin_create_staff` were confirmed to sign in
+through Supabase Auth.

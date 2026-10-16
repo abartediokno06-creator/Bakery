@@ -25,10 +25,11 @@ export function BranchSwitcher() {
   const single = branches.length === 1 && !isSuperAdmin;
 
   return (
-    <div className="flex items-center gap-2">
-      <Store className="h-5 w-5 shrink-0 text-ube" aria-hidden />
+    // Sits on the green header: white text, gold accents.
+    <div className="flex min-w-0 items-center gap-2">
+      <Store className="hidden h-5 w-5 shrink-0 text-white sm:block" aria-hidden />
       {single ? (
-        <span className="font-semibold text-ink">{activeBranch?.name}</span>
+        <span className="truncate font-bold text-white">{activeBranch?.name}</span>
       ) : (
         <select
           aria-label="Working branch"
@@ -37,7 +38,7 @@ export function BranchSwitcher() {
             clearCart();
             setActiveBranchId(e.target.value === "all" ? null : e.target.value);
           }}
-          className="h-10 max-w-[240px] rounded-lg border border-line bg-white px-2 text-sm font-semibold text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ube"
+          className="h-10 min-w-0 max-w-[260px] rounded-xl border-0 bg-white px-2 text-sm font-bold text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold"
         >
           {isSuperAdmin && <option value="all">All branches</option>}
           {Object.entries(byBrand).map(([brand, list]) => (
@@ -52,7 +53,7 @@ export function BranchSwitcher() {
         </select>
       )}
       {activeRole && (
-        <span className="hidden rounded-full bg-ube-light px-2 py-0.5 text-xs font-semibold text-ube-dark sm:inline">
+        <span className="hidden shrink-0 rounded-full bg-gold px-2.5 py-0.5 text-xs font-bold text-ink sm:inline">
           {ROLE_LABEL[activeRole]}
         </span>
       )}

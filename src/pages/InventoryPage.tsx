@@ -1,9 +1,13 @@
 import { useState } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
+import { Link } from "react-router-dom";
+import { Moon } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
+import { Button, buttonVariants } from "@/components/ui/button";
 import { Card, CardBody, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { Select } from "@/components/ui/select";
+import { PickBranch } from "@/components/layout/PickBranch";
 import { useBranch } from "@/context/BranchContext";
 import { useBranchInventory } from "@/hooks/useBranchInventory";
 import { supabase, toErrorMessage } from "@/lib/supabase";
@@ -22,7 +26,7 @@ export function InventoryPage() {
   const [kind, setKind] = useState<Enums<"item_kind">>("finished_good");
   const inv = useBranchInventory(branchId, { kinds: [kind] });
 
-  if (!activeBranch) return <p className="p-8 text-muted">Pick a branch in the top bar to see its stock.</p>;
+  if (!activeBranch) return <PickBranch purpose="Pick a branch to see its stock." />;
 
   return (
     <div className="grid gap-4 p-4 xl:grid-cols-[1fr_360px]">
@@ -43,7 +47,7 @@ export function InventoryPage() {
               role="tab"
               aria-selected={kind === k}
               onClick={() => setKind(k)}
-              className={cn("rounded-full px-3 py-1 text-sm font-semibold", kind === k ? "bg-ink text-white" : "text-muted hover:bg-surface")}
+              className={cn("h-10 rounded-full px-4 text-sm font-bold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand", kind === k ? "bg-brand text-white" : "text-muted hover:bg-brand-light hover:text-brand-dark")}
             >
               {KIND_LABEL[k]}
             </button>
@@ -76,6 +80,11 @@ export function InventoryPage() {
       </Card>
 
       <div className="space-y-4">
+        {can("leftovers.record") && (
+          <Link to="/end-of-day" className={buttonVariants({ variant: "secondary", size: "lg", className: "w-full" })}>
+            <Moon className="h-5 w-5" aria-hidden /> End-of-day leftovers
+          </Link>
+        )}
         {can("production.record") && <ProductionForm branchId={activeBranch.id} />}
         {can("inventory.adjust") && (
           <AdjustForm branchId={activeBranch.id} options={inv.items.map((i) => ({ id: i.product_id, name: i.product.name }))} />
@@ -113,12 +122,12 @@ function ProductionForm({ branchId }: { branchId: string }) {
       <CardHeader><CardTitle>Record a bake</CardTitle></CardHeader>
       <CardBody className="space-y-3">
         <p className="text-sm text-muted">Ingredients are deducted and baked goods are added automatically.</p>
-        <select value={recipeId} onChange={(e) => setRecipeId(e.target.value)} className="h-11 w-full rounded-lg border border-line bg-white px-3" aria-label="Recipe">
+        <Select value={recipeId} onChange={(e) => setRecipeId(e.target.value)} aria-label="Recipe">
           <option value="">Choose recipe</option>
           {recipes.data?.map((r) => (
             <option key={r.id} value={r.id}>{r.name}</option>
           ))}
-        </select>
+        </Select>
         <Input inputMode="decimal" value={batches} onChange={(e) => setBatches(e.target.value)} aria-label="Batches" placeholder="Batches" />
         <Button className="w-full" disabled={!recipeId || toNumber(batches) <= 0 || record.isPending} onClick={() => record.mutate()}>
           Record bake
@@ -157,14 +166,14 @@ function AdjustForm({ branchId, options }: { branchId: string; options: Array<{ 
     <Card>
       <CardHeader><CardTitle>Adjust stock</CardTitle></CardHeader>
       <CardBody className="space-y-3">
-        <select value={productId} onChange={(e) => setProductId(e.target.value)} className="h-11 w-full rounded-lg border border-line bg-white px-3" aria-label="Item">
+        <Select value={productId} onChange={(e) => setProductId(e.target.value)} aria-label="Item">
           <option value="">Choose item</option>
           {options.map((o) => <option key={o.id} value={o.id}>{o.name}</option>)}
-        </select>
-        <select value={reason} onChange={(e) => setReason(e.target.value as typeof reason)} className="h-11 w-full rounded-lg border border-line bg-white px-3" aria-label="Reason">
+        </Select>
+        <Select value={reason} onChange={(e) => setReason(e.target.value as typeof reason)} aria-label="Reason">
           <option value="spoilage">Spoilage / unsold (removes stock)</option>
           <option value="adjustment">Count correction (+ or -)</option>
-        </select>
+        </Select>
         <Input inputMode="decimal" value={delta} onChange={(e) => setDelta(e.target.value)} placeholder="Quantity" aria-label="Quantity" />
         <Input value={note} onChange={(e) => setNote(e.target.value)} placeholder="Note" aria-label="Note" />
         <Button className="w-full" disabled={!productId || toNumber(delta) === 0 || adjust.isPending} onClick={() => adjust.mutate()}>

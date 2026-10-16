@@ -1,4 +1,4 @@
-import type { Enums, Tables } from "./database.types";
+import type { Enums, Tables, Views } from "./database.types";
 
 export type Branch = Tables<"branches">;
 export type Profile = Tables<"profiles">;
@@ -7,10 +7,20 @@ export type BranchInventoryRow = Tables<"branch_inventory">;
 export type Transaction = Tables<"transactions">;
 export type StockTransfer = Tables<"stock_transfers">;
 export type CashShift = Tables<"cash_shifts">;
+export type SpecialOrder = Views<"v_special_orders">;
+export type OpenDrawer = Views<"v_open_drawers">;
 
 export type AppRole = Enums<"app_role">;
 export type PaymentMethod = Enums<"payment_method">;
 export type TransferStatus = Enums<"transfer_status">;
+export type OrderStatus = Enums<"order_status">;
+
+/** Senior citizen / PWD discount details the BIR log needs. */
+export type DiscountLogInput = {
+  type: "senior" | "pwd";
+  customer_name: string;
+  id_number: string;
+};
 
 /** Inventory row joined with its product, as used by POS and stock screens. */
 export type InventoryItem = BranchInventoryRow & {
@@ -41,6 +51,8 @@ export type SalePayload = {
   discount_total: number;
   sold_at: string;
   was_offline: boolean;
+  /** Required with a Senior/PWD discount; saved to discount_logs. */
+  discount_log?: DiscountLogInput | null;
   items: Array<{
     product_id: string;
     quantity: number;

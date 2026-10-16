@@ -10,7 +10,8 @@
     "typecheck": "tsc -b --noEmit",
     "db:types": "supabase gen types typescript --local > src/types/database.types.ts",
     "db:types:remote": "supabase gen types typescript --project-id $SUPABASE_PROJECT_ID > src/types/database.types.ts",
-    "db:reset": "supabase db reset"
+    "db:reset": "supabase db reset",
+    "db:seed-users": "node scripts/create-test-users.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.45.4",

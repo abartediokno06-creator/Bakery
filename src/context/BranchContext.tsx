@@ -20,22 +20,28 @@ export type Permission =
   | "pos.sell"
   | "pos.void"
   | "inventory.adjust"
+  | "leftovers.record"
   | "production.record"
   | "transfer.request"
   | "transfer.dispatch"
   | "transfer.receive"
-  | "reports.global";
+  | "orders.manage"
+  | "reports.view"
+  | "reports.global"
+  | "catalog.manage"
+  | "staff.manage";
 
 const ROLE_PERMISSIONS: Record<AppRole | "super_admin", readonly Permission[]> = {
   super_admin: [
-    "pos.sell", "pos.void", "inventory.adjust", "production.record",
-    "transfer.request", "transfer.dispatch", "transfer.receive", "reports.global",
+    "pos.sell", "pos.void", "inventory.adjust", "leftovers.record", "production.record",
+    "transfer.request", "transfer.dispatch", "transfer.receive", "orders.manage",
+    "reports.view", "reports.global", "catalog.manage", "staff.manage",
   ],
   branch_manager: [
-    "pos.sell", "pos.void", "inventory.adjust", "production.record",
-    "transfer.request", "transfer.dispatch", "transfer.receive",
+    "pos.sell", "pos.void", "inventory.adjust", "leftovers.record", "production.record",
+    "transfer.request", "transfer.dispatch", "transfer.receive", "orders.manage", "reports.view",
   ],
-  cashier: ["pos.sell", "transfer.receive"],
+  cashier: ["pos.sell", "leftovers.record", "transfer.receive", "orders.manage"],
   baker: ["production.record", "transfer.request", "transfer.dispatch", "transfer.receive"],
 };
 

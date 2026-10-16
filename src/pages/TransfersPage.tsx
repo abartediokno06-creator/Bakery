@@ -4,6 +4,8 @@ import { Badge, type BadgeProps } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardBody, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { Select } from "@/components/ui/select";
+import { PickBranch } from "@/components/layout/PickBranch";
 import { useBranch } from "@/context/BranchContext";
 import { useTransfers, type TransferLineInput } from "@/hooks/useTransfers";
 import { supabase, toErrorMessage } from "@/lib/supabase";
@@ -11,7 +13,7 @@ import { toNumber } from "@/lib/utils";
 import type { Branch, TransferStatus } from "@/types/domain";
 
 const STATUS: Record<TransferStatus, { label: string; tone: NonNullable<BadgeProps["tone"]> }> = {
-  requested: { label: "Requested", tone: "ube" },
+  requested: { label: "Requested", tone: "brand" },
   dispatched: { label: "On the way", tone: "warn" },
   received: { label: "Received", tone: "good" },
   cancelled: { label: "Cancelled", tone: "neutral" },
@@ -19,7 +21,7 @@ const STATUS: Record<TransferStatus, { label: string; tone: NonNullable<BadgePro
 
 export function TransfersPage() {
   const { activeBranch } = useBranch();
-  if (!activeBranch) return <p className="p-8 text-muted">Pick a branch in the top bar to manage transfers.</p>;
+  if (!activeBranch) return <PickBranch purpose="Pick a branch to manage its transfers." />;
   return <Transfers branch={activeBranch} />;
 }
 
@@ -130,15 +132,15 @@ function RequestForm({
     <Card>
       <CardHeader><CardTitle>Request stock</CardTitle></CardHeader>
       <CardBody className="space-y-3">
-        <select value={fromId} onChange={(e) => setFromId(e.target.value)} className="h-11 w-full rounded-lg border border-line bg-white px-3" aria-label="From branch">
+        <Select value={fromId} onChange={(e) => setFromId(e.target.value)} aria-label="From branch">
           <option value="">Send from which branch?</option>
           {branches.data?.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}
-        </select>
+        </Select>
         <div className="flex gap-2">
-          <select value={productId} onChange={(e) => setProductId(e.target.value)} className="h-11 min-w-0 flex-1 rounded-lg border border-line bg-white px-3" aria-label="Item">
+          <Select value={productId} onChange={(e) => setProductId(e.target.value)} className="min-w-0 flex-1" aria-label="Item">
             <option value="">Item</option>
             {products.data?.map((p) => <option key={p.id} value={p.id}>{p.name} ({p.unit})</option>)}
-          </select>
+          </Select>
           <Input inputMode="decimal" value={qty} onChange={(e) => setQty(e.target.value)} placeholder="Qty" className="w-20" aria-label="Quantity" />
           <Button variant="secondary" onClick={addLine}>Add</Button>
         </div>

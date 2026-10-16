@@ -1,11 +1,14 @@
 import { useMemo, useRef, useState, type KeyboardEvent } from "react";
-import { Search } from "lucide-react";
+import { CakeSlice, Coffee, Cookie, Croissant, Sandwich, Search, Wheat, type LucideIcon } from "lucide-react";
 import { Input } from "@/components/ui/input";
+import { useT } from "@/lib/i18n";
 import { cn, formatPeso } from "@/lib/utils";
 import type { InventoryItem } from "@/types/domain";
 
 export type ProductGridProps = {
   items: readonly InventoryItem[];
+  /** Quantity of each product already in the order, keyed by product id. */
+  inCart?: ReadonlyMap<string, number>;
   onAdd: (item: InventoryItem) => void;
   /** Called when a scanned/typed code matches nothing. */
   onUnknownCode?: (code: string) => void;
@@ -13,10 +16,20 @@ export type ProductGridProps = {
 
 const ALL = "All";
 
+/** Picture per category so cashiers can find items without reading every name. */
+const CATEGORY_ICON: Record<string, LucideIcon> = {
+  Bread: Croissant,
+  Loaf: Sandwich,
+  Cakes: CakeSlice,
+  Pastry: Cookie,
+  Drinks: Coffee,
+};
+
 /** Effective selling price for a branch (override wins). */
 export const priceOf = (i: InventoryItem): number => i.price_override ?? i.product.price;
 
-export function ProductGrid({ items, onAdd, onUnknownCode }: ProductGridProps) {
+export function ProductGrid({ items, inCart, onAdd, onUnknownCode }: ProductGridProps) {
+  const { t } = useT();
   const [search, setSearch] = useState("");
   const [category, setCategory] = useState(ALL);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -56,16 +69,16 @@ export function ProductGrid({ items, onAdd, onUnknownCode }: ProductGridProps) {
   return (
     <div className="flex h-full min-h-0 flex-col gap-3">
       <div className="relative">
-        <Search className="pointer-events-none absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-muted" aria-hidden />
+        <Search className="pointer-events-none absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-muted" aria-hidden />
         <Input
           ref={inputRef}
           autoFocus
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           onKeyDown={onKeyDown}
-          placeholder="Search or scan barcode"
+          placeholder={t("Search item or scan barcode")}
           aria-label="Search products or scan barcode"
-          className="h-12 pl-10 text-lg"
+          className="h-14 rounded-2xl pl-12 text-lg"
         />
       </div>
 
@@ -77,42 +90,62 @@ export function ProductGrid({ items, onAdd, onUnknownCode }: ProductGridProps) {
             aria-selected={category === c}
             onClick={() => setCategory(c)}
             className={cn(
-              "h-10 shrink-0 rounded-full px-4 text-sm font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ube",
-              category === c ? "bg-ink text-white" : "bg-white text-ink border border-line hover:bg-ube-light",
+              "h-12 shrink-0 rounded-full px-5 text-base font-bold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2",
+              category === c ? "bg-brand text-white" : "border border-line bg-white text-ink hover:border-brand hover:bg-brand-light",
             )}
           >
-            {c}
+            {c === ALL ? t("All") : c}
           </button>
         ))}
       </div>
 
-      <div className="grid min-h-0 flex-1 auto-rows-min grid-cols-2 gap-3 overflow-y-auto pr-1 sm:grid-cols-3 xl:grid-cols-4">
+      <div className="grid min-h-0 flex-1 auto-rows-min grid-cols-2 gap-3 overflow-y-auto p-1 sm:grid-cols-3 xl:grid-cols-4">
         {visible.map((item) => {
           const out = item.quantity <= 0;
           const low = !out && item.quantity <= item.reorder_level;
+          const qty = inCart?.get(item.product_id) ?? 0;
+          const Icon = CATEGORY_ICON[item.product.category] ?? Wheat;
           return (
             <button
               key={item.id}
               onClick={() => onAdd(item)}
               className={cn(
-                "group flex min-h-[112px] flex-col justify-between rounded-tile border bg-white p-3 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ube active:bg-ube-light",
-                out ? "border-danger/40" : "border-line hover:border-ube",
+                "relative flex min-h-[152px] flex-col rounded-tile border-2 bg-white p-3 text-left shadow-sm transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2 active:scale-[0.97] motion-reduce:transform-none",
+                qty > 0 ? "border-brand" : "border-line hover:border-brand/50",
               )}
             >
-              <span className="line-clamp-2 text-[15px] font-semibold leading-snug text-ink">
+              {qty > 0 && (
+                <span className="absolute right-2 top-2 grid h-8 min-w-[2rem] place-items-center rounded-full bg-brand px-2 text-sm font-extrabold tabular-nums text-white">
+                  {qty}
+                  <span className="sr-only"> {t("in this order")}</span>
+                </span>
+              )}
+              <span
+                className={cn(
+                  "grid h-12 w-12 place-items-center overflow-hidden rounded-xl",
+                  out ? "bg-surface text-muted" : "bg-brand-light text-brand",
+                )}
+              >
+                {item.product.image_url ? (
+                  <img src={item.product.image_url} alt="" className="h-full w-full object-cover" />
+                ) : (
+                  <Icon className="h-6 w-6" aria-hidden />
+                )}
+              </span>
+              <span className="mt-2 line-clamp-2 text-base font-bold leading-snug text-ink">
                 {item.product.name}
               </span>
-              <span className="mt-2 flex items-end justify-between gap-2">
-                <span className="text-lg font-extrabold tabular-nums text-ube-dark">
+              <span className="mt-auto flex flex-wrap items-end justify-between gap-x-2 gap-y-1 pt-2">
+                <span className={cn("text-xl font-extrabold tabular-nums", out ? "text-muted" : "text-brand")}>
                   {formatPeso(priceOf(item))}
                 </span>
                 <span
                   className={cn(
-                    "text-xs font-semibold tabular-nums",
-                    out ? "text-danger" : low ? "text-amber" : "text-muted",
+                    "rounded-full px-2 py-0.5 text-xs font-bold tabular-nums",
+                    out ? "bg-danger/10 text-danger" : low ? "bg-amber/10 text-amber" : "text-muted",
                   )}
                 >
-                  {out ? "Out" : `${item.quantity} left`}
+                  {out ? t("Sold out") : t(low ? "Only {n} left" : "{n} left", { n: item.quantity })}
                 </span>
               </span>
             </button>
@@ -120,7 +153,7 @@ export function ProductGrid({ items, onAdd, onUnknownCode }: ProductGridProps) {
         })}
         {visible.length === 0 && (
           <p className="col-span-full py-10 text-center text-muted">
-            No products match "{search}". Check the spelling or scan again.
+            {t('No products match "{q}". Check the spelling or scan again.', { q: search })}
           </p>
         )}
       </div>
